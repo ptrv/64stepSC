@@ -1,7 +1,10 @@
 (
 
 var numRows = 8;
-var numCols = 8;
+var numCols = 8*8;
+var colsOffset = 0;
+var loopStart = 4;
+var loopLength = 8;
 
 var window, decorator, matrix, buttonMatrix, leds;
 var monome;
@@ -14,240 +17,124 @@ var ledTrigger;
 var ledTriggerOff;
 var rowOneTrigger;
 var inentsity = 15;
+var pager = 0;
+var calcWaitTime;
+var waitTime = (bpm/60)/resolution;
+
 monome = Monome.new;
 matrix = Array2D.new(numRows, numCols);
 matrix = Array2D.fromArray(numRows, numCols, { 0.dup(numCols) }.dup(numRows).value.flat);
 matrix[0,0] = 1;
 monome.action = { |x, y, on|
-    //[x, y, on].postln;
-    if(y == 0,
-        {
-            matrix[y, 0] = 0;
-            matrix[y, 1] = 0;
-            matrix[y, 2] = 0;
-            matrix[y, 3] = 0;
-            matrix[y, 4] = 0;
-            matrix[y, 5] = 0;
-            matrix[y, 6] = 0;
-            matrix[y, 7] = 0;
-            monome.led(0, y, 0);
-            monome.led(1, y, 0);
-            monome.led(2, y, 0);
-            monome.led(3, y, 0);
-            monome.led(4, y, 0);
-            monome.led(5, y, 0);
-            monome.led(6, y, 0);
-            monome.led(7, y, 0);
-            matrix[y,x] = 1;
-            monome.led(x, y, matrix[y,x]);
-        },
-        {
-            if(on == 1,
-                {
-                    if(matrix[y,x] == 0,
-                        {
-                            matrix[y,x] = 1;
-                            monome.led(x, y, matrix[y,x]);
-                        },{
-                            matrix[y,x] = 0;
-                            monome.led(x, y, matrix[y,x]);
-                    });
+    // [x, y, on].postln;
+    var vX = x + (pager * 8);
+
+    // if button pushed in first row
+    if(y == 0, {
+        8.do { |i|
+            matrix[0, i] = 0;
+            monome.led(i, 0, 0);
+        };
+        matrix[y,x] = 1;
+        monome.led(x, y, matrix[y,x]);
+
+        // set pager
+        pager = x;
+
+        // refresh leds
+        (1..7).do { |i|
+            8.do { |j|
+                var tmpX = (pager * 8) + j;
+                monome.led(j, i, matrix[i, tmpX])
+            };
+        };
+    },{
+        if(on == 1, {
+            if(matrix[y,vX] == 0, {
+                matrix[y,vX] = 1;
+                monome.led(x, y, matrix[y,vX]);
+            },{
+                matrix[y,vX] = 0;
+                monome.led(x, y, matrix[y,vX]);
             });
-
-        }
-    );
+        });
+    });
 };
-
-ledBitMaskFuncOn = {
-    arg col;
-    var bitNum = 255;
-    bitNum = bitNum.setBit(0, false);
-    col.do{ |item, pos|
-        if(item == 1,
-            {
-                bitNum = bitNum.setBit(pos, true);
-            },
-            {
-                bitNum = bitNum.setBit(pos, false);
-            };
-        );
-    };
-    bitNum;
-};
-ledBitMaskFuncOff = {
-    arg col;
-    var bitNum = 255;
-    bitNum = bitNum.setBit(0, true);
-    col.do{ |item, pos|
-        if(item == 1,
-            {
-                bitNum = bitNum.setBit(pos, false);
-            },
-            {
-                bitNum = bitNum.setBit(pos, true);
-            };
-        );
-    };
-    bitNum;
-};
-
-// ledTrigger = {
-//     arg col, bitMaskOff, bitMaskOn;
-//     var t = Task({
-//         // monome.intensity(5);
-//         monome.ledCol(col, 0, 254);
-//         (((bpm/60)/resolution)/4).wait;
-//         monome.ledCol(col, 0, bitMaskOn);
-//         // (((bpm/60)/resolution)/4).wait;
-//         // monome.ledCol(col, 0, bitMask);
-//         // (((bpm/60)/resolution)/4).wait;
-//         // monome.ledCol(col, 0, 0);
-//         // (((bpm/60)/resolution)/4).wait;
-//         // monome.intensity(15);
-//     });
-//     t.start;
-// };
 
 ledTrigger = {
     arg col, on;
     var t = Task({
         // monome.intensity(5);
-        monome.led(col, 1, 1);
-        monome.led(col, 2, 1);
-        monome.led(col, 3, 1);
-        monome.led(col, 4, 1);
-        monome.led(col, 5, 1);
-        monome.led(col, 6, 1);
-        monome.led(col, 7, 1);
-        (((bpm/60)/resolution)/4).wait;
-        monome.led(col, 1, on[1]);
-        monome.led(col, 2, on[2]);
-        monome.led(col, 3, on[3]);
-        monome.led(col, 4, on[4]);
-        monome.led(col, 5, on[5]);
-        monome.led(col, 6, on[6]);
-        monome.led(col, 7, on[7]);
-
+        var vColS = (pager*8);
+        var vColE = (pager*8 + 8);
+        if((col >= vColS) && (col < vColE),{
+            (numRows-1).do { |i|
+                monome.led(col%8, i+1, 1);
+            };
+            (waitTime/8).wait;
+            (numRows-1).do { |i|
+                monome.led(col%8, i+1, on[i+1]);
+            };
+        });
     });
     t.start;
 };
 
+// function to set leds back which are not the timeline
 ledTriggerOff = {
     arg col, on;
-    monome.led(col, 1, on[1]);
-    monome.led(col, 2, on[2]);
-    monome.led(col, 3, on[3]);
-    monome.led(col, 4, on[4]);
-    monome.led(col, 5, on[5]);
-    monome.led(col, 6, on[6]);
-    monome.led(col, 7, on[7]);
+    var vColS = (pager*8);
+    var vColE = (pager*8 + 8);
+    if((col >= vColS) && (col < vColE), {
+        (numRows-1).do { |i|
+            monome.led(col%8, i+1, on[i+1]);
+        };
+    });
 };
 
 rowOneTrigger = {
     arg row;
     t = Task({
-        monome.led(0, 0, row[0]);
-        monome.led(1, 0, row[1]);
-        monome.led(2, 0, row[2]);
-        monome.led(3, 0, row[3]);
-        monome.led(4, 0, row[4]);
-        monome.led(5, 0, row[5]);
-        monome.led(6, 0, row[6]);
-        monome.led(7, 0, row[7]);
-        (((bpm/60)/resolution)/4).wait;
+        row.do { |item, i|
+            monome.led(i, 0, row[i]);
+        };
+        (waitTime/4).wait;
         monome.ledRow(0, 0, 0);
-        (((bpm/60)/resolution)/4).wait;
-        monome.led(0, 0, row[0]);
-        monome.led(1, 0, row[1]);
-        monome.led(2, 0, row[2]);
-        monome.led(3, 0, row[3]);
-        monome.led(4, 0, row[4]);
-        monome.led(5, 0, row[5]);
-        monome.led(6, 0, row[6]);
-        monome.led(7, 0, row[7]);
-        (((bpm/60)/resolution)/4).wait;
+        (waitTime/4).wait;
+        row.do { |item, i|
+            monome.led(i, 0, row[i]);
+        };
+        (waitTime/4).wait;
+        monome.ledRow(0, 0, 0);
+        (waitTime/4).wait;
+        row.do { |item, i|
+            monome.led(i, 0, row[i]);
+        };
         monome.ledRow(0, 0, 0);
     });
 };
 
 player = Task({
     inf.do{ |counter|
-        var col = counter % numCols;
+        var col = (counter % loopLength) + loopStart;
+        var lastCol = loopStart + loopLength;
+        var visibleColStart = pager * 8;
         // main func
         matrix.colAt(col).do{ |item, pos|
-            var ipos = (pos - (numRows-1)).abs;
-            // ipos.postln;
-
-            // LED func
-
-
-            //0.25.wait;      // quarter notes
+            // TODO: implement sound playing
         };
 
         rowOneTrigger.value(matrix.rowAt(0)).start;
         if(col != 0)
         {
             {
-                // var bitNum = ledBitMaskFuncOn.value(matrix.colAt(col-1));
-                // var bitNum2 = ledBitMaskFuncOn.value(matrix.colAt(col));
-                // var bitNum3 = ledBitMaskFuncOff.value(matrix.colAt(col));
-                // monome.ledCol(col, 0, bitNum2);
-                // ledTrigger.value(col, bitNum3, bitNum2);
-                //
-                // // monome.ledCol(col, 0, 254);
-                // // ledTrigger.value(col, 254);
-                // monome.ledCol(col-1, 0, bitNum);
-
-                // monome.led(col, 1, 1);
-                // monome.led(col, 2, 1);
-                // monome.led(col, 3, 1);
-                // monome.led(col, 4, 1);
-                // monome.led(col, 5, 1);
-                // monome.led(col, 6, 1);
-                // monome.led(col, 7, 1);
-                //
-                //
-                // monome.led(col-1, 1, 0);
-                // monome.led(col-1, 2, 0);
-                // monome.led(col-1, 3, 0);
-                // monome.led(col-1, 4, 0);
-                // monome.led(col-1, 5, 0);
-                // monome.led(col-1, 6, 0);
-                // monome.led(col-1, 7, 0);
-
                 ledTrigger.value(col, matrix.colAt(col));
                 ledTriggerOff.value(col-1, matrix.colAt(col-1));
             }.defer;
-
         }{
             {
-                // var bitNum = ledBitMaskFuncOn.value(matrix.colAt(numCols-1));
-                // var bitNum2 = ledBitMaskFuncOn.value(matrix.colAt(col));
-                // var bitNum3 = ledBitMaskFuncOff.value(matrix.colAt(col));
-                //
-                // monome.ledCol(col, 0, bitNum2);
-                // ledTrigger.value(col, bitNum3, bitNum2);
-                // monome.ledCol(numCols-1, 0, bitNum);
-
-                // monome.led(col, 1, 1);
-                // monome.led(col, 2, 1);
-                // monome.led(col, 3, 1);
-                // monome.led(col, 4, 1);
-                // monome.led(col, 5, 1);
-                // monome.led(col, 6, 1);
-                // monome.led(col, 7, 1);
-                //
-                //
-                // monome.led(numCols-1, 1, 0);
-                // monome.led(numCols-1, 2, 0);
-                // monome.led(numCols-1, 3, 0);
-                // monome.led(numCols-1, 4, 0);
-                // monome.led(numCols-1, 5, 0);
-                // monome.led(numCols-1, 6, 0);
-                // monome.led(numCols-1, 7, 0);
-
                 ledTrigger.value(col, matrix.colAt(col));
-                ledTriggerOff.value(numCols-1, matrix.colAt(numCols-1));
+                ledTriggerOff.value(lastCol-1, matrix.colAt(lastCol-1));
             }.defer;
         };
         ((bpm/60)/resolution).wait;
@@ -258,7 +145,5 @@ player = Task({
 // player.start;
 CmdPeriod.removeAll;
 CmdPeriod.add({player.stop; monome.clear;});
-// ledFunc.value(1, 255);
 player.start;
 )
-
