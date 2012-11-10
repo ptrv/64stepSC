@@ -63,7 +63,7 @@ monome.action = { |x, y, on|
 
 ledTrigger = {
     arg col, on;
-    var t = Task({
+    var task = Task.new({
         // monome.intensity(5);
         var vColS = (pager*8);
         var vColE = (pager*8 + 8);
@@ -77,7 +77,7 @@ ledTrigger = {
             };
         });
     });
-    t.start;
+    task.start;
 };
 
 // function to set leds back which are not the timeline
@@ -94,7 +94,7 @@ ledTriggerOff = {
 
 rowOneTrigger = {
     arg row;
-    t = Task({
+    var task2 = Task.new({
         row.do { |item, i|
             monome.led(i, 0, row[i]);
         };
@@ -112,6 +112,7 @@ rowOneTrigger = {
         };
         monome.ledRow(0, 0, 0);
     });
+    task2;
 };
 
 player = Task({
