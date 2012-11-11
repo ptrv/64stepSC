@@ -8,7 +8,7 @@ SixtyFourStep {
     var <numCols;
     var <>loopStart = 0;
 
-    var window, decorator, matrix, buttonMatrix, leds;
+    var matrix;
     var monome;
     var <player;
     var ledBitMaskFuncOn;
@@ -18,14 +18,24 @@ SixtyFourStep {
     var rowOneTrigger;
     var inentsity = 15;
     var pager = 0;
+    var gui;
+    var <>samples;
+    var window, decorator;
+    var sndFileViews;
+    var sndLoadButtons;
 
 
-    *new { |bpm=105, resolution=4, pages=2, loopLength=16|
+    *new { |bpm=105, resolution=4, pages=2, loopLength=8|
         ^super.newCopyArgs(bpm, resolution, pages, loopLength).init;
     }
 
     init {
         numCols = pages * 8;
+        if(loopLength > numCols)
+        {
+            loopLength = numCols;
+            ("loopLength larger than number of columns. Set to number of columns.").warn;
+        };
         monome = Monome.new;
         // matrix = Array2D.new(numRows, numCols);
         matrix = Array2D.fromArray(numRows, numCols, { 0.dup(numCols) }.dup(numRows).value.flat);
@@ -52,7 +62,7 @@ SixtyFourStep {
 
                     // refresh leds
                     (1..7).do { |i|
-                        (numCols/8).do { |j|
+                        8.do { |j|
                             var tmpX = (pager * 8) + j;
                             monome.led(j, i, matrix[i, tmpX])
                         };
@@ -156,10 +166,47 @@ SixtyFourStep {
             }
         });
 
+        samples = [];
+        7.do { |i|
+            samples.insert(i, SoundFile.new);
+        };
+        window = Window("SixtyFourStep", Rect(128, 64, 340, 360)).alwaysOnTop_(true);
+        decorator = window.addFlowLayout(5@5, 5@5);
+        sndFileViews = [];
+        sndLoadButtons = [];
+        7.do { arg i;
+            if(i != 0, {decorator.nextLine});
+            sndFileViews.insert(i, SoundFileView.new(window, 120@40));
+            sndLoadButtons.insert(i, Button.new(window, 30@30)
+                .action_({
+
+                    Dialog.openPanel(
+                        {
+                            arg path;
+                            var sndF = SoundFile.new;
+                            sndF.openRead(path);
+                            samples = samples.put(i, sndF);
+                            sndFileViews[i].soundfile = sndF;
+                            sndFileViews[i].read(0, sndF.numFrames);
+                            sndFileViews[i].refresh;
+                        },{
+                            "cancelled".postln;
+                        }
+                    );
+                })
+            );
+        };
+
+        window.front;
         CmdPeriod.add({this.reset});
         this.player.start;
     }
 
+    loadSample { arg index;
+
+
+        ^samples.at(index);
+    }
     waitTime { arg mult=1;
         ^(((bpm/60)/resolution)*mult);
     }
