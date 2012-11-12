@@ -42,7 +42,7 @@ SixtyFourStep {
             };
             monome = Monome.new;
             // matrix = Array2D.new(numRows, numCols);
-            matrix = Array2D.fromArray(numRows, numCols, { 0.dup(numCols) }.dup(numRows).value.flat);
+            matrix = Array2D.fromArray(numRows, numCols, 0.dup(numRows*numCols));
             matrix[0,0] = 1;
 
             monome.action = { |x, y, on|
@@ -185,7 +185,7 @@ SixtyFourStep {
 
             posButtons = [];
             pageButtons = Array.new;
-            posView = View(window, 100@40);
+            posView = View(window, 100@20);
             posView.decorator = FlowLayout(posView.bounds,0@0, 0@0);
             8.do {|i|
                 var button;
@@ -205,8 +205,29 @@ SixtyFourStep {
             8.do {|i|
                 var button;
                 button = Button(posView, 10@10);
+                button.states = [
+                    [ "", Color.gray, Color.gray ],
+                    [ "", Color.green, Color.green ]
+                ];
 
-                posButton = posButtons.add(button);
+                posButtons = posButtons.add(button);
+            };
+            goBtn = Button(window, 20@20);
+            goBtn.states = [
+                ["Go", Color.white, Color.gray ],
+                [ "Go", Color.white, Color.green ]
+            ];
+            goBtn.action = { arg btn;
+                if(this.player.isPlaying)
+                {
+                    this.player.pause;
+                    // btn.value_(0);
+                    "pause".postln;
+                }{
+                    this.player.play;
+                    // btn.value_(1);
+                    "play".postln;
+                }
             };
 
             decorator.nextLine;
@@ -234,7 +255,7 @@ SixtyFourStep {
             window.front;
             // ------------------------------------------------------------------
             CmdPeriod.add({this.reset});
-            this.player.start;
+            // this.player.start;
             this.update;
         });
 
