@@ -1,3 +1,18 @@
+SoundFile64step : SoundFile {
+    var <>selections;
+
+    *new {
+        ^super.new.init
+    }
+
+    init {
+        selections = [];
+        64.do {
+            selections = selections.add([0, 0]);
+        }
+    }
+}
+
 SixtyFourStep {
 
     var <bpm;
@@ -19,13 +34,12 @@ SixtyFourStep {
     var inentsity = 15;
     var pager = 0;
     var gui;
-    var <>samples;
+    var <>samples, samplesMenu, muteButtons, muteAllBtn;
     var window, decorator;
-    var sndFileViews;
-    var sndLoadButtons;
-    var posButtons;
-    var pageButtons;
-    var posView;
+    var sndFileView, sndLoadButton, sndFilePopup;
+    var sndPropsView, currentRowBtn;
+    var posButtons, pageButtons, posView, sndEnvView;
+    var goBtn, currentSample;
 
 
     *new { |bpm=105, resolution=4, pages=2, loopLength=8|
@@ -41,10 +55,12 @@ SixtyFourStep {
                 ("loopLength larger than number of columns. Set to number of columns.").warn;
             };
             monome = Monome.new;
-            // matrix = Array2D.new(numRows, numCols);
             matrix = Array2D.fromArray(numRows, numCols, 0.dup(numRows*numCols));
+            // set current page to 1
             matrix[0,0] = 1;
-
+            // ------------------------------------------------------------------
+            // Monome action
+            // ------------------------------------------------------------------
             monome.action = { |x, y, on|
                 // [x, y, on].postln;
                 var vX = x + (pager * 8);
@@ -89,6 +105,9 @@ SixtyFourStep {
                 this.update;
             };
 
+            // ------------------------------------------------------------------
+            // Trigger functions
+            // ------------------------------------------------------------------
             ledTrigger = {
                 arg col, on;
                 var task = Task.new({
@@ -145,6 +164,9 @@ SixtyFourStep {
                 task;
             };
 
+            // ------------------------------------------------------------------
+            // player task
+            // ------------------------------------------------------------------
             player = Task({
                 inf.do{ |counter|
                     var col = (counter % loopLength) + loopStart;
@@ -172,17 +194,13 @@ SixtyFourStep {
                 }
             });
 
-            samples = [];
-            7.do { |i|
-                samples.insert(i, SoundFile.new);
-            };
-
             // ------------------------------------------------------------------
             // GUI
             // ------------------------------------------------------------------
-            window = Window("SixtyFourStep", Rect(128, 64, 600, 400)).alwaysOnTop_(true);
+            window = Window("SixtyFourStep", Rect(128, 64, 640, 200)).alwaysOnTop_(true);
             decorator = window.addFlowLayout(5@5, 5@5);
 
+            // ------------------------------------------------------------------
             posButtons = [];
             pageButtons = Array.new;
             posView = View(window, 100@20);
@@ -215,7 +233,7 @@ SixtyFourStep {
             goBtn = Button(window, 20@20);
             goBtn.states = [
                 ["Go", Color.white, Color.gray ],
-                [ "Go", Color.white, Color.green ]
+                ["Go", Color.white, Color.green ]
             ];
             goBtn.action = { arg btn;
                 if(this.player.isPlaying)
@@ -230,27 +248,102 @@ SixtyFourStep {
                 }
             };
 
+            // ------------------------------------------------------------------
             decorator.nextLine;
 
-            sndFileViews = [];
-            sndLoadButtons = [];
-            7.do { arg i;
-                if(i != 0, {decorator.nextLine});
-                sndFileViews.insert(i, SoundFileView.new(window, 120@40));
-                sndLoadButtons.insert(i, Button.new(window, 30@30)
-                    .action_({
-                        Dialog.openPanel({
-                            arg path;
-                            var sndF = SoundFile.new;
-                            sndF.openRead(path);
-                            samples = samples.put(i, sndF);
-                            sndFileViews[i].soundfile = sndF;
-                            sndFileViews[i].read(0, sndF.numFrames);
-                            sndFileViews[i].refresh;
-                        });
-                    })
+            // ------------------------------------------------------------------
+            sndPropsView = View(window, 200@150);
+            sndPropsView.decorator = FlowLayout(sndPropsView.bounds, 0@0);
+            currentRowBtn = Button.new(sndPropsView, 40@40);
+            currentRowBtn.states = [
+                ["A 1", Color.white, Color.gray],
+                ["S 2", Color.white, Color.gray],
+                ["D 3", Color.white, Color.gray],
+                ["F 4", Color.white, Color.gray],
+                ["G 5", Color.white, Color.gray],
+                ["H 6", Color.white, Color.gray],
+                ["J 7", Color.white, Color.gray]
+            ];
+            currentRowBtn.action = { arg butt;
+                butt.value.postln;
+            };
+
+            window.view.keyDownAction = { arg view, char, modifiers, unicode, keycode;
+                switch(char,
+                    $a, {currentRowBtn.valueAction_(0)},
+                    $s, {currentRowBtn.valueAction_(1)},
+                    $d, {currentRowBtn.valueAction_(2)},
+                    $f, {currentRowBtn.valueAction_(3)},
+                    $g, {currentRowBtn.valueAction_(4)},
+                    $h, {currentRowBtn.valueAction_(5)},
+                    $j, {currentRowBtn.valueAction_(6)}
                 );
             };
+
+            samples = [];
+            sndLoadButton = Button.new(sndPropsView, 40@40);
+            sndLoadButton.states = [["Load", Color.white, Color.gray]];
+            sndLoadButton.action = {
+                Dialog.openPanel({ arg path;
+                    var sndF = SoundFile64step.new;
+                    var pn;
+                    sndF.openRead(path);
+                    pn = PathName(sndF.path);
+                    samples = samples.add(sndF);
+                    samplesMenu.items = samplesMenu.items.add(pn.fileNameWithoutExtension);
+                    currentSample = samples.size-1;
+                    samplesMenu.valueAction_(currentSample);
+                });
+            };
+
+            sndPropsView.decorator.nextLine;
+            samplesMenu = PopUpMenu(sndPropsView, 200@20);
+            samplesMenu.items = [];
+            samplesMenu.action = { arg menu;
+                currentSample = menu.value;
+                sndFileView.soundfile = samples.at(currentSample);
+                sndFileView.read(0, sndFileView.soundfile.numFrames);
+                if(samples.at(currentSample).selections.size > 0)
+                {
+                    sndFileView.setSelection(0, samples.at(currentSample).selections[0]);
+                };
+                sndFileView.refresh;
+            };
+            sndPropsView.decorator.nextLine;
+            7.do { |i|
+                var butt = Button(sndPropsView, 20@20);
+                butt.states = [
+                    [(""+i), Color.white, Color.grey],
+                    [(""+i), Color.white, Color.red]
+                ];
+                muteButtons = muteButtons.add(butt);
+            };
+            muteAllBtn = Button(sndPropsView,
+                sndPropsView.decorator.indentedRemaining.width@20);
+            muteAllBtn.states = [
+                ["All", Color.white, Color.grey],
+                ["All", Color.white, Color.red]
+            ];
+
+            // ------------------------------------------------------------------
+            sndFileView = SoundFileView.new(window, 200@150);
+            sndFileView.mouseUpAction = {
+                var selection = sndFileView.selections[sndFileView.currentSelection];
+                // ("mouseUp, current selection is now:"
+                // + selection).postln;
+                samples.at(currentSample).selections[0] = selection;
+            };
+
+            // ------------------------------------------------------------------
+            sndEnvView = EnvelopeView(window, 200@150)
+                .drawLines_(true)
+                .selectionColor_(Color.red)
+                .drawRects_(true)
+                .resize_(5)
+                .step_(0.05)
+                .action_({arg b; /*[b.index, b.value].postln*/})
+                .thumbSize_(5)
+                .value_([[0.0, 0.0, 0.5, 1.0],[0.0,1.0,1.0,0.0]]);
 
             window.front;
             // ------------------------------------------------------------------
@@ -261,11 +354,6 @@ SixtyFourStep {
 
     }
 
-    loadSample { arg index;
-
-
-        ^samples.at(index);
-    }
     waitTime { arg mult=1;
         ^(((bpm/60)/resolution)*mult);
     }
